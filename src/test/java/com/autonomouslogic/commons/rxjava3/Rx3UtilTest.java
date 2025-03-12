@@ -5,10 +5,8 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-import io.reactivex.rxjava3.core.Flowable;
-import io.reactivex.rxjava3.core.FlowableTransformer;
-import io.reactivex.rxjava3.core.Observable;
-import io.reactivex.rxjava3.core.ObservableTransformer;
+import io.reactivex.rxjava3.core.*;
+import io.reactivex.rxjava3.plugins.RxJavaPlugins;
 import io.reactivex.rxjava3.schedulers.Schedulers;
 import io.reactivex.rxjava3.subscribers.TestSubscriber;
 import java.time.Duration;
@@ -19,8 +17,11 @@ import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Supplier;
 import lombok.SneakyThrows;
+import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
 class Rx3UtilTest {
@@ -28,6 +29,18 @@ class Rx3UtilTest {
 	private static final FlowableTransformer<String, String> IDENTITY_FLOWABLE_TRANSFORMER = upstream -> upstream;
 
 	RuntimeException textEx = new RuntimeException("test error");
+
+	static final AtomicReference<Throwable> caughtError = new AtomicReference<>();
+
+	@BeforeAll
+	static void beforeAll() {
+		RxJavaPlugins.setErrorHandler(caughtError::set);
+	}
+
+	@BeforeEach
+	void setup() {
+		caughtError.set(null);
+	}
 
 	@Test
 	void shouldConvertCompletionStageToSingle() {
@@ -37,11 +50,22 @@ class Rx3UtilTest {
 	}
 
 	@Test
+	void confirmCatchSingleFromFuture() {
+		// This test confirms how RxJava's fromFuture works, so it can be replicated below
+		var future = CompletableFuture.failedFuture(textEx);
+		var single = Single.fromFuture(future);
+		var ex = assertThrows(RuntimeException.class, single::blockingGet);
+		assertEquals(
+				"java.util.concurrent.ExecutionException: java.lang.RuntimeException: test error", ex.getMessage());
+	}
+
+	@Test
 	void shouldCatchCompletionStageErrorsToSingle() {
-		var future = CompletableFuture.failedStage(textEx);
+		var future = CompletableFuture.failedFuture(textEx);
 		var single = Rx3Util.toSingle(future);
 		var ex = assertThrows(RuntimeException.class, single::blockingGet);
-		assertEquals("test error", ex.getMessage());
+		assertEquals(
+				"java.util.concurrent.ExecutionException: java.lang.RuntimeException: test error", ex.getMessage());
 	}
 
 	@Test
@@ -59,8 +83,17 @@ class Rx3UtilTest {
 	}
 
 	@Test
+	void confirmCatchMaybeFromFuture() {
+		// This test confirms how RxJava's fromFuture works, so it can be replicated below
+		var future = CompletableFuture.failedFuture(textEx);
+		var maybe = Maybe.fromFuture(future);
+		var ex = assertThrows(RuntimeException.class, maybe::blockingGet);
+		assertEquals("test error", ex.getMessage());
+	}
+
+	@Test
 	void shouldCatchCompletionStageErrorsToMaybe() {
-		var future = CompletableFuture.failedStage(textEx);
+		var future = CompletableFuture.failedFuture(textEx);
 		var maybe = Rx3Util.toMaybe(future);
 		var ex = assertThrows(RuntimeException.class, maybe::blockingGet);
 		assertEquals("test error", ex.getMessage());
@@ -75,13 +108,24 @@ class Rx3UtilTest {
 	}
 
 	@Test
+	void confirmCatchCompletableFromFuture() {
+		// This test confirms how RxJava's fromFuture works, so it can be replicated below
+		var future = CompletableFuture.failedFuture(textEx);
+		var completable = Completable.fromFuture(future);
+		var ex = assertThrows(RuntimeException.class, completable::blockingAwait);
+		assertEquals(
+				"java.util.concurrent.ExecutionException: java.lang.RuntimeException: test error", ex.getMessage());
+	}
+
+	@Test
 	void shouldCatchCompletionStageErrorsToCompletable() {
 		var future = CompletableFuture.runAsync(() -> {
 			throw textEx;
 		});
 		var completable = Rx3Util.toCompletable(future);
 		var ex = assertThrows(RuntimeException.class, completable::blockingAwait);
-		assertEquals("test error", ex.getMessage());
+		assertEquals(
+				"java.util.concurrent.ExecutionException: java.lang.RuntimeException: test error", ex.getMessage());
 	}
 
 	@Test
