@@ -42,6 +42,9 @@ class Rx3UtilTest {
 		caughtError.set(null);
 	}
 
+	//////////////
+	// toSingle()
+
 	@Test
 	void shouldConvertCompletionStageToSingle() {
 		var future = CompletableFuture.completedStage("test");
@@ -57,6 +60,8 @@ class Rx3UtilTest {
 		var ex = assertThrows(RuntimeException.class, single::blockingGet);
 		assertEquals(
 				"java.util.concurrent.ExecutionException: java.lang.RuntimeException: test error", ex.getMessage());
+
+		assertNull(caughtError.get());
 	}
 
 	@Test
@@ -66,7 +71,25 @@ class Rx3UtilTest {
 		var ex = assertThrows(RuntimeException.class, single::blockingGet);
 		assertEquals(
 				"java.util.concurrent.ExecutionException: java.lang.RuntimeException: test error", ex.getMessage());
+
+		assertNull(caughtError.get());
 	}
+
+	@Test
+	@SneakyThrows
+	void shouldCancelSingle() {
+		var future = delayedErrorFuture();
+		var single = Rx3Util.toSingle(future);
+		var disposable = single.subscribe();
+		disposable.dispose();
+		assertTrue(disposable.isDisposed());
+		assertTrue(future.isCancelled());
+		Thread.sleep(200);
+		assertNull(caughtError.get());
+	}
+
+	//////////////
+	// toMaybe()
 
 	@Test
 	void shouldConvertCompletionStageToMaybe() {
@@ -89,6 +112,8 @@ class Rx3UtilTest {
 		var maybe = Maybe.fromFuture(future);
 		var ex = assertThrows(RuntimeException.class, maybe::blockingGet);
 		assertEquals("test error", ex.getMessage());
+
+		assertNull(caughtError.get());
 	}
 
 	@Test
@@ -97,7 +122,25 @@ class Rx3UtilTest {
 		var maybe = Rx3Util.toMaybe(future);
 		var ex = assertThrows(RuntimeException.class, maybe::blockingGet);
 		assertEquals("test error", ex.getMessage());
+
+		assertNull(caughtError.get());
 	}
+
+	@Test
+	@SneakyThrows
+	void shouldCancelMaybe() {
+		var future = delayedErrorFuture();
+		var maybe = Rx3Util.toMaybe(future);
+		var disposable = maybe.subscribe();
+		disposable.dispose();
+		assertTrue(disposable.isDisposed());
+		assertTrue(future.isCancelled());
+		Thread.sleep(200);
+		assertNull(caughtError.get());
+	}
+
+	//////////////
+	// toCompletable()
 
 	@Test
 	void shouldConvertCompletionStageToCompletable() {
@@ -115,6 +158,8 @@ class Rx3UtilTest {
 		var ex = assertThrows(RuntimeException.class, completable::blockingAwait);
 		assertEquals(
 				"java.util.concurrent.ExecutionException: java.lang.RuntimeException: test error", ex.getMessage());
+
+		assertNull(caughtError.get());
 	}
 
 	@Test
@@ -126,7 +171,25 @@ class Rx3UtilTest {
 		var ex = assertThrows(RuntimeException.class, completable::blockingAwait);
 		assertEquals(
 				"java.util.concurrent.ExecutionException: java.lang.RuntimeException: test error", ex.getMessage());
+
+		assertNull(caughtError.get());
 	}
+
+	@Test
+	@SneakyThrows
+	void shouldCancelCompletable() {
+		var future = delayedErrorFuture();
+		var completable = Rx3Util.toCompletable(future);
+		var disposable = completable.subscribe();
+		disposable.dispose();
+		assertTrue(disposable.isDisposed());
+		assertTrue(future.isCancelled());
+		Thread.sleep(200);
+		assertNull(caughtError.get());
+	}
+
+	//////////////
+	// wrapTransformerErrors()
 
 	@Test
 	void shouldWrapObservableTransformerErrors() {
@@ -223,6 +286,9 @@ class Rx3UtilTest {
 		var result = flowable.blockingFirst();
 		assertEquals("result", result);
 	}
+
+	//////////////
+	// Others
 
 	@Test
 	@SneakyThrows
@@ -332,5 +398,19 @@ class Rx3UtilTest {
 		for (int j = 0; j < 2; j++) {
 			assertEquals(1000, Duration.between(times.get(j), times.get(j + 1)).toMillis(), 100);
 		}
+	}
+
+	//////////////
+	// Utils
+
+	private static CompletableFuture<Void> delayedErrorFuture() {
+		return CompletableFuture.runAsync(() -> {
+			try {
+				Thread.sleep(100);
+			} catch (InterruptedException e) {
+				throw new RuntimeException(e);
+			}
+			throw new RuntimeException("delayed error");
+		});
 	}
 }
