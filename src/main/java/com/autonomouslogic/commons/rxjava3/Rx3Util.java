@@ -19,6 +19,7 @@ import java.util.Comparator;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
+import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -47,7 +48,7 @@ public class Rx3Util {
 			future.whenComplete((result, throwable) -> {
 				if (!emitter.isDisposed()) {
 					if (throwable != null) {
-						emitter.onError(throwable);
+						emitter.onError(new ExecutionException(throwable));
 					} else if (result != null) {
 						emitter.onSuccess(result);
 					} else {
@@ -79,7 +80,7 @@ public class Rx3Util {
 			future.whenComplete((result, throwable) -> {
 				if (!emitter.isDisposed()) {
 					if (throwable != null) {
-						emitter.onError(throwable);
+						emitter.onError(new ExecutionException(throwable));
 					} else if (result != null) {
 						emitter.onSuccess(result);
 					} else {
@@ -110,7 +111,7 @@ public class Rx3Util {
 					if (throwable != null) {
 						// Emit only the cause message
 						if (throwable.getCause() != null) {
-							emitter.onError(throwable.getCause());
+							emitter.onError(new ExecutionException(throwable));
 						} else {
 							emitter.onError(throwable);
 						}

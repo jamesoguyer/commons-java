@@ -64,6 +64,7 @@ class Rx3UtilTest {
 		var future = CompletableFuture.failedFuture(textEx);
 		var single = Single.fromFuture(future);
 		var ex = assertThrows(RuntimeException.class, single::blockingGet);
+		ex.printStackTrace();
 		assertEquals(
 				"java.util.concurrent.ExecutionException: java.lang.RuntimeException: test error", ex.getMessage());
 
@@ -75,6 +76,7 @@ class Rx3UtilTest {
 		var future = CompletableFuture.failedFuture(textEx);
 		var single = Rx3Util.toSingle(future);
 		var ex = assertThrows(RuntimeException.class, single::blockingGet);
+		ex.printStackTrace();
 		assertEquals(
 				"java.util.concurrent.ExecutionException: java.lang.RuntimeException: test error", ex.getMessage());
 
@@ -117,6 +119,7 @@ class Rx3UtilTest {
 		var future = CompletableFuture.failedFuture(textEx);
 		var maybe = Maybe.fromFuture(future);
 		var ex = assertThrows(RuntimeException.class, maybe::blockingGet);
+		ex.printStackTrace();
 		assertEquals("test error", ex.getMessage());
 
 		assertNull(caughtError.get());
@@ -127,7 +130,9 @@ class Rx3UtilTest {
 		var future = CompletableFuture.failedFuture(textEx);
 		var maybe = Rx3Util.toMaybe(future);
 		var ex = assertThrows(RuntimeException.class, maybe::blockingGet);
-		assertEquals("test error", ex.getMessage());
+		ex.printStackTrace();
+		assertEquals(
+				"java.util.concurrent.ExecutionException: java.lang.RuntimeException: test error", ex.getMessage());
 
 		assertNull(caughtError.get());
 	}
@@ -159,9 +164,12 @@ class Rx3UtilTest {
 	@Test
 	void confirmCatchCompletableFromFuture() {
 		// This test confirms how RxJava's fromFuture works, so it can be replicated below
-		var future = CompletableFuture.failedFuture(textEx);
+		var future = CompletableFuture.runAsync(() -> {
+			throw textEx;
+		});
 		var completable = Completable.fromFuture(future);
 		var ex = assertThrows(RuntimeException.class, completable::blockingAwait);
+		ex.printStackTrace();
 		assertEquals(
 				"java.util.concurrent.ExecutionException: java.lang.RuntimeException: test error", ex.getMessage());
 
@@ -175,8 +183,10 @@ class Rx3UtilTest {
 		});
 		var completable = Rx3Util.toCompletable(future);
 		var ex = assertThrows(RuntimeException.class, completable::blockingAwait);
+		ex.printStackTrace();
 		assertEquals(
-				"java.util.concurrent.ExecutionException: java.lang.RuntimeException: test error", ex.getMessage());
+				"java.util.concurrent.ExecutionException: java.util.concurrent.CompletionException: java.lang.RuntimeException: test error",
+				ex.getMessage());
 
 		assertNull(caughtError.get());
 	}
@@ -357,8 +367,9 @@ class Rx3UtilTest {
 		var result = Flowable.fromIterable(ints)
 				.compose(Rx3Util.checkOrder(Integer::compareTo))
 				.toList();
-		var e = assertThrows(RuntimeException.class, () -> result.blockingGet());
-		assertEquals("Stream isn't ordered - last: 5, current: 4", e.getMessage());
+		var ex = assertThrows(RuntimeException.class, () -> result.blockingGet());
+		ex.printStackTrace();
+		assertEquals("Stream isn't ordered - last: 5, current: 4", ex.getMessage());
 	}
 
 	@Test
@@ -397,8 +408,9 @@ class Rx3UtilTest {
 				.compose(Rx3Util.retryWithDelayFlowable(
 						100, Duration.ofSeconds(1), e -> !e.getMessage().equals("test error 2")))
 				.blockingFirst();
-		var e = assertThrows(RuntimeException.class, func::get);
-		assertEquals("test error 2", e.getMessage());
+		var ex = assertThrows(RuntimeException.class, func::get);
+		ex.printStackTrace();
+		assertEquals("test error 2", ex.getMessage());
 		assertEquals(3, count.get());
 		assertEquals(3, times.size());
 		for (int j = 0; j < 2; j++) {
